@@ -9,7 +9,7 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+import type { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
@@ -88,7 +88,7 @@ export class AuthController {
         });
         const userId = payload.sub as number;
         const userType = payload.userType as string;
-        await this.authService.logout(userId, userType);
+        await this.authService.logout(userId, userType as 'ADMIN' | 'MEDIC' | 'PATIENT');
       } catch (_) {
         // ignore if token invalid
       }
