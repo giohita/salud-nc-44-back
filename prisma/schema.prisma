@@ -108,3 +108,18 @@ model Clinical_data {
   patient Patients @relation(fields: [ID_Patients], references: [ID_Patients])
   medic   Medics   @relation(fields: [ID_medics], references: [ID_medics])
 }
+
+enum UserType {
+  ADMIN
+  MEDIC
+  PATIENT
+}
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  tokenHash  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  userType   UserType
+  userId     Int
+}
