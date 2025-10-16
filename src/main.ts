@@ -14,6 +14,12 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
+  // Habilitar CORS para localhost:3001
+  app.enableCors({
+    origin: 'http://localhost:3001',
+    credentials: true, // si necesitas enviar cookies o autenticación
+  });
+
   // Configurar el puerto desde variable de entorno o usar 3000 como valor por defecto
   const port = process.env.PORT || 3000;
   
