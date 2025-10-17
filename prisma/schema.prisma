@@ -1,3 +1,5 @@
+// TODO: Hacer la migración
+
 generator client {
   provider = "prisma-client-js"
 }
