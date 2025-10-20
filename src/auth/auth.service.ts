@@ -151,4 +151,67 @@ export class AuthService {
     }
     return 7 * 24 * 60 * 60 * 1000;
   }
+
+  async requestPasswordReset(dni: string): Promise<{ resetToken: string }> {
+    const user = await this.usersService.findByDni(dni);
+    if (!user) throw new UnauthorizedException('Usuario no encontrado');
+
+    const payload = {
+      sub: user.id,
+      dni: user.dni,
+      userType: user.userType,
+      action: 'password_reset' as const,
+    };
+
+    const resetToken = await this.jwtService.signAsync(payload, {
+      secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET'),
+      expiresIn: this.config.get('JWT_RESET_EXPIRES_IN') || '15m',
+    });
+
+    return { resetToken };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    try {
+      const payload = await this.jwtService.verifyAsync<any>(token, {
+        secret: this.config.get('JWT_RESET_SECRET') || this.config.get('JWT_SECRET'),
+      });
+
+      if (!payload || payload.action !== 'password_reset') {
+        throw new UnauthorizedException('Token de recuperación inválido');
+      }
+
+      const user = await this.usersService.findByDni(payload.dni);
+      if (!user) throw new UnauthorizedException('Usuario no encontrado');
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      switch (user.userType) {
+        case 'ADMIN':
+          await this.prisma.admins.update({
+            where: { ID_Admins: user.id },
+            data: { passwordHash: hashedPassword },
+          });
+          break;
+        case 'MEDIC':
+          await this.prisma.medics.update({
+            where: { ID_medics: user.id },
+            data: { passwordHash: hashedPassword },
+          });
+          break;
+        case 'PATIENT':
+          await this.prisma.patients.update({
+            where: { ID_Patients: user.id },
+            data: { passwordHash: hashedPassword },
+          });
+          break;
+        default:
+          throw new UnauthorizedException('Tipo de usuario inválido');
+      }
+
+      return true;
+    } catch (e) {
+      throw new UnauthorizedException('Token de recuperación inválido o expirado');
+    }
+  }
 }

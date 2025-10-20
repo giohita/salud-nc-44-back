@@ -1,0 +1,2 @@
+-- Empty migration placeholder recreated to align local migration history with database.
+-- This migration intentionally contains no SQL changes.
