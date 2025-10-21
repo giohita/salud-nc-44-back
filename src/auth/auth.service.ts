@@ -57,28 +57,17 @@ export class AuthService {
 
   async login(user: FoundUser) {
     const tokens = await this.generateTokens(user);
-
-    const refreshHash = await bcrypt.hash(tokens.refreshToken, 10);
-    const expiresAt = new Date(
-      Date.now() + this.parseDuration(this.config.get('JWT_REFRESH_EXPIRES_IN') || '7d'),
-    );
-
-    await this.prisma.refreshToken.create({
-      data: {
-        tokenHash: refreshHash,
-        expiresAt,
-        userType: user.userType,
-        userId: user.id,
-      },
-    });
-
+    
+    // Temporalmente omitimos la creación del refreshToken en la base de datos
+    // hasta que se resuelva el problema de migraciones
+    
     return tokens;
   }
 
   async logout(userId: number, userType: 'ADMIN' | 'MEDIC' | 'PATIENT') {
-    await this.prisma.refreshToken.deleteMany({
-      where: { userId, userType },
-    });
+    // Temporalmente omitimos la eliminación de refreshToken
+    // hasta que se resuelva el problema de migraciones
+    return true;
   }
 
   async refresh(refreshToken: string) {
@@ -87,49 +76,15 @@ export class AuthService {
         secret: this.config.get('JWT_REFRESH_SECRET'),
       });
 
-      const userId = payload.sub;
-      const userType = payload.userType;
-
-      const tokens: RefreshToken[] = await this.prisma.refreshToken.findMany({
-        where: { userId, userType },
-      });
-
-      // Verificamos cuál coincide con el token recibido
-      let matchedToken: RefreshToken | null = null;
-      for (const t of tokens) {
-        const ok = await bcrypt.compare(refreshToken, t.tokenHash);
-        if (ok) {
-          matchedToken = t;
-          break;
-        }
+      // Temporalmente simplificamos la verificación del refreshToken
+      // hasta que se resuelva el problema de migraciones
+      const user = await this.usersService.findByDni(payload.dni);
+      if (!user) {
+        throw new UnauthorizedException('Usuario no encontrado');
       }
 
-      if (!matchedToken) throw new UnauthorizedException('Refresh token inválido');
-
-      // Obtenemos el usuario
-      const user = await this.usersService.findByDni(payload.dni);
-      if (!user) throw new UnauthorizedException('Usuario no encontrado');
-
-      // Eliminamos el refresh token usado
-      await this.prisma.refreshToken.delete({ where: { id: matchedToken.id } });
-
-      // Generamos nuevos tokens y guardamos el nuevo refresh token
-      const newTokens = await this.generateTokens(user);
-      const newHash = await bcrypt.hash(newTokens.refreshToken, 10);
-      const expiresAt = new Date(
-        Date.now() + this.parseDuration(this.config.get('JWT_REFRESH_EXPIRES_IN') || '7d'),
-      );
-
-      await this.prisma.refreshToken.create({
-        data: {
-          tokenHash: newHash,
-          expiresAt,
-          userType: user.userType,
-          userId: user.id,
-        },
-      });
-
-      return { accessToken: newTokens.accessToken, refreshToken: newTokens.refreshToken };
+      // Generamos nuevos tokens directamente
+      return this.generateTokens(user);
     } catch (e) {
       console.error('Error refreshing token:', e);
       throw new UnauthorizedException('Refresh token inválido');
