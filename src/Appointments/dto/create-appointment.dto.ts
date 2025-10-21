@@ -13,6 +13,9 @@ export class CreateAppointmentDto {
   @IsDateString()
   appointmentDatetime: string;
 
+  @IsString()
+  status: string; // ← Este campo es obligatorio
+
   @IsOptional()
   @IsString()
   notes?: string;
