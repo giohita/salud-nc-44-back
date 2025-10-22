@@ -1,307 +1,462 @@
-# Documentación de Endpoints de Usuarios
+# Documentación del Módulo de Usuarios
 
-Esta documentación detalla todos los endpoints relacionados con la gestión de usuarios en el sistema de Portal Web de Coordinación de Citas y Teleasistencia.
+Este documento describe detalladamente el módulo de usuarios del sistema de salud, incluyendo todos los endpoints, validaciones, respuestas y ejemplos de uso.
 
-## Índice
-1. [Autenticación](#autenticación)
-2. [Administración de Usuarios](#administración-de-usuarios)
+## Información General del Módulo
 
----
+### Descripción
+El módulo de usuarios permite la gestión de tres tipos de usuarios en el sistema:
+- **ADMIN**: Administradores del sistema
+- **MEDIC**: Médicos y profesionales de la salud
+- **PATIENT**: Pacientes del sistema
 
-## Autenticación
+### Arquitectura
+- **Controlador**: `UsersController` - Maneja las peticiones HTTP
+- **Servicio**: `UsersService` - Contiene la lógica de negocio
+- **DTO**: `CreateUserDto` - Validación de datos de entrada
+- **Base de datos**: Prisma ORM con PostgreSQL
 
-### Login
-Permite a los usuarios iniciar sesión en el sistema.
-
-- **URL**: `/auth/login`
-- **Método**: `POST`
-- **Autenticación requerida**: No
-- **Permisos requeridos**: Ninguno
-
-**Cuerpo de la solicitud**:
-```json
-{
-  "dni": "12345678",
-  "password": "contraseña"
-}
-```
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-- **Cookies**: Se establece una cookie HTTP-only con el refresh token
-
-**Respuestas de error**:
-- **Código**: 401 Unauthorized
-- **Contenido**:
-```json
-{
-  "statusCode": 401,
-  "message": "Credenciales inválidas",
-  "error": "Unauthorized"
-}
-```
-
-### Refresh Token
-Permite renovar el token de acceso utilizando el refresh token.
-
-- **URL**: `/auth/refresh`
-- **Método**: `POST`
-- **Autenticación requerida**: Sí (refresh token en cookie)
-- **Permisos requeridos**: Ninguno
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-}
-```
-- **Cookies**: Se actualiza la cookie HTTP-only con el nuevo refresh token
-
-**Respuestas de error**:
-- **Código**: 401 Unauthorized
-- **Contenido**:
-```json
-{
-  "statusCode": 401,
-  "message": "Refresh token inválido o expirado",
-  "error": "Unauthorized"
-}
-```
-
-### Logout
-Permite a los usuarios cerrar sesión en el sistema.
-
-- **URL**: `/auth/logout`
-- **Método**: `POST`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: Ninguno
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
-```json
-{
-  "message": "Sesión cerrada correctamente"
-}
-```
-- **Cookies**: Se elimina la cookie de refresh token
+### Seguridad Implementada
+- Autenticación JWT requerida para todos los endpoints
+- Hash de contraseñas con bcrypt (salt rounds: 10)
+- Validación de datos de entrada con class-validator
+- Exclusión de datos sensibles en las respuestas
 
 ---
 
-## Administración de Usuarios
+## Endpoints Implementados
 
-### Crear Usuario
-Permite a los administradores crear nuevos usuarios (administradores, médicos o pacientes).
+### 1. Crear Usuario
 
-- **URL**: `/admin/users`
-- **Método**: `POST`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: ADMIN
+**Endpoint**: `POST /admin/users`
 
-**Cuerpo de la solicitud**:
+**Descripción**: Permite a los administradores crear nuevos usuarios en el sistema.
+
+**Autenticación**: 
+- Requerida: JWT Token válido
+- Solo administradores pueden acceder
+
+**Headers**:
+```
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+```
+
+#### Request Body
+
+**Estructura base**:
 ```json
 {
-  "DNI": "87654321",
-  "Email": "usuario@example.com",
-  "password": "Contraseña123!",
-  "Name": "Nombre",
-  "Lastname": "Apellido",
-  "Phone_number": "987654321",
-  "userType": "MEDIC", // Puede ser: ADMIN, MEDIC, PATIENT
-  "gender": "MALE" // Requerido para MEDIC y PATIENT. Puede ser: MALE, FEMALE, OTHER
+  "userType": "ADMIN" | "MEDIC" | "PATIENT",
+  "DNI": "string",
+  "Name": "string", 
+  "Lastname": "string",
+  "password": "string",
+  "Email": "string (opcional)",
+  "Phone_number": "string (opcional)"
 }
 ```
 
-**Respuesta exitosa**:
-- **Código**: 201 Created
-- **Contenido**:
+**Campos específicos por tipo de usuario**:
+
+##### Para ADMIN:
 ```json
 {
-  "id": 2,
-  "name": "Nombre",
-  "lastname": "Apellido",
-  "email": "usuario@example.com",
-  "dni": "87654321",
-  "phone_number": "987654321",
+  "userType": "ADMIN",
+  "DNI": "string (7-12 caracteres, único)",
+  "Name": "string (requerido)",
+  "Lastname": "string (requerido)", 
+  "Email": "string (opcional, formato email válido)",
+  "password": "string (mínimo 8 caracteres)",
+  "Phone_number": "string (opcional)"
+}
+```
+
+##### Para MEDIC:
+```json
+{
   "userType": "MEDIC",
-  "createdAt": "2025-10-17T21:52:55.528Z",
-  "updatedAt": "2025-10-17T21:52:55.528Z"
+  "DNI": "string (7-12 caracteres, único)",
+  "Name": "string (requerido)",
+  "Lastname": "string (requerido)",
+  "email": "string (opcional, formato email válido)",
+  "password": "string (mínimo 8 caracteres)",
+  "phone_number": "string (opcional)",
+  "gender": "MALE" | "FEMALE" | "OTHER" (requerido)",
+  "Birthdate": "string (formato ISO, requerido)",
+  "specialty": "string (opcional)",
+  "schedule": "string (opcional)"
 }
 ```
 
-**Respuestas de error**:
-- **Código**: 400 Bad Request (datos inválidos)
-- **Código**: 401 Unauthorized (no autenticado)
-- **Código**: 403 Forbidden (no tiene permisos)
-- **Código**: 409 Conflict (DNI o Email ya existen)
-
-### Listar Usuarios
-Permite a los administradores obtener una lista paginada de usuarios.
-
-- **URL**: `/admin/users`
-- **Método**: `GET`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: ADMIN
-
-**Parámetros de consulta**:
-- `page` (opcional): Número de página (por defecto: 1)
-- `limit` (opcional): Número de elementos por página (por defecto: 10)
-- `userType` (opcional): Filtrar por tipo de usuario (ADMIN, MEDIC, PATIENT)
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
+##### Para PATIENT:
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "name": "Admin",
-      "lastname": "Sistema",
-      "email": "admin@example.com",
-      "dni": "12345678",
-      "phone_number": "123456789",
-      "userType": "ADMIN",
-      "createdAt": "2025-10-17T00:00:00.000Z",
-      "updatedAt": "2025-10-17T00:00:00.000Z"
-    },
-    // Más usuarios...
-  ],
-  "meta": {
-    "total": 25,
-    "page": 1,
-    "limit": 10
+  "userType": "PATIENT", 
+  "DNI": "string (7-12 caracteres, único)",
+  "Name": "string (requerido)",
+  "Lastname": "string (requerido)",
+  "email": "string (opcional, formato email válido)",
+  "password": "string (mínimo 8 caracteres)",
+  "phone_number": "string (opcional)",
+  "gender": "MALE" | "FEMALE" | "OTHER" (requerido)",
+  "Birthdate": "string (formato ISO, requerido)",
+  "address": "string (opcional)"
+}
+```
+
+#### Validaciones
+
+| Campo | Validación | Descripción |
+|-------|------------|-------------|
+| `userType` | Enum | Debe ser "ADMIN", "MEDIC" o "PATIENT" |
+| `DNI` | String, único | 7-12 caracteres, único en todo el sistema |
+| `Name` | String, requerido | Nombre del usuario |
+| `Lastname` | String, requerido | Apellido del usuario |
+| `password` | String, min 8 | Mínimo 8 caracteres, se hashea con bcrypt |
+| `Email/email` | Email válido | Formato de email válido si se proporciona |
+| `gender` | Enum | Requerido para MEDIC y PATIENT |
+| `Birthdate` | ISO Date | Requerido para MEDIC y PATIENT |
+
+#### Respuestas
+
+##### Éxito (201 Created)
+```json
+{
+  "message": "Usuario creado exitosamente",
+  "user": {
+    "id": 1,
+    "dni": "12345678",
+    "userType": "ADMIN",
+    "email": "admin@hospital.com",
+    "name": "Juan",
+    "lastname": "Pérez"
   }
 }
 ```
 
-### Obtener Usuario
-Permite a los administradores obtener los detalles de un usuario específico.
+**Nota**: El campo `passwordHash` nunca se incluye en la respuesta por seguridad.
 
-- **URL**: `/admin/users/:id`
-- **Método**: `GET`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: ADMIN
+##### Errores
 
-**Parámetros de ruta**:
-- `id`: ID del usuario
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
+**400 Bad Request - Datos inválidos**:
 ```json
 {
-  "id": 2,
-  "name": "Doctor",
-  "lastname": "Ejemplo",
-  "email": "medico@example.com",
-  "dni": "87654321",
-  "phone_number": "987654321",
-  "userType": "MEDIC",
-  "createdAt": "2025-10-17T21:52:55.528Z",
-  "updatedAt": "2025-10-17T21:52:55.528Z"
+  "statusCode": 400,
+  "message": [
+    "password must be longer than or equal to 8 characters",
+    "Email must be an email"
+  ],
+  "error": "Bad Request"
 }
 ```
 
-**Respuestas de error**:
-- **Código**: 401 Unauthorized (no autenticado)
-- **Código**: 403 Forbidden (no tiene permisos)
-- **Código**: 404 Not Found (usuario no encontrado)
-
-### Actualizar Usuario
-Permite a los administradores actualizar los datos de un usuario existente.
-
-- **URL**: `/admin/users/:id`
-- **Método**: `PATCH`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: ADMIN
-
-**Parámetros de ruta**:
-- `id`: ID del usuario
-
-**Cuerpo de la solicitud** (todos los campos son opcionales):
+**400 Bad Request - Campos requeridos faltantes**:
 ```json
 {
-  "Name": "Nuevo Nombre",
-  "Lastname": "Nuevo Apellido",
-  "Email": "nuevo@example.com",
-  "Phone_number": "999999999",
-  "password": "NuevaContraseña123!"
+  "statusCode": 400,
+  "message": "Gender y Birthdate son requeridos para médicos",
+  "error": "Bad Request"
 }
 ```
 
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
+**401 Unauthorized - Token inválido**:
 ```json
 {
-  "id": 2,
-  "name": "Nuevo Nombre",
-  "lastname": "Nuevo Apellido",
-  "email": "nuevo@example.com",
-  "dni": "87654321",
-  "phone_number": "999999999",
-  "userType": "MEDIC",
-  "createdAt": "2025-10-17T21:52:55.528Z",
-  "updatedAt": "2025-10-17T22:00:00.000Z"
+  "statusCode": 401,
+  "message": "Unauthorized"
 }
 ```
 
-**Respuestas de error**:
-- **Código**: 400 Bad Request (datos inválidos)
-- **Código**: 401 Unauthorized (no autenticado)
-- **Código**: 403 Forbidden (no tiene permisos)
-- **Código**: 404 Not Found (usuario no encontrado)
-- **Código**: 409 Conflict (Email ya existe)
-
-### Eliminar Usuario
-Permite a los administradores eliminar un usuario del sistema.
-
-- **URL**: `/admin/users/:id`
-- **Método**: `DELETE`
-- **Autenticación requerida**: Sí (access token)
-- **Permisos requeridos**: ADMIN
-
-**Parámetros de ruta**:
-- `id`: ID del usuario
-
-**Respuesta exitosa**:
-- **Código**: 200 OK
-- **Contenido**:
+**409 Conflict - DNI duplicado**:
 ```json
 {
-  "message": "Usuario eliminado correctamente"
+  "statusCode": 409,
+  "message": "Usuario con este DNI ya existe",
+  "error": "Conflict"
 }
 ```
 
-**Respuestas de error**:
-- **Código**: 401 Unauthorized (no autenticado)
-- **Código**: 403 Forbidden (no tiene permisos)
-- **Código**: 404 Not Found (usuario no encontrado)
+**500 Internal Server Error**:
+```json
+{
+  "statusCode": 500,
+  "message": "Internal server error"
+}
+```
 
-## Consideraciones de Seguridad
+---
 
-1. **Autenticación**: Todos los endpoints de administración requieren un token JWT válido.
-2. **Autorización**: Solo los usuarios con rol ADMIN pueden acceder a los endpoints de administración.
-3. **Validación de datos**: Todos los datos de entrada son validados antes de procesarse.
-4. **Protección de contraseñas**: Las contraseñas se almacenan hasheadas utilizando bcrypt.
-5. **Refresh Tokens**: Se utilizan refresh tokens para mantener la sesión del usuario de forma segura.
+## Ejemplos de Uso
 
-## Códigos de Estado HTTP
+### Ejemplo 1: Crear Administrador
 
-- **200 OK**: La solicitud se ha completado correctamente.
-- **201 Created**: El recurso se ha creado correctamente.
-- **400 Bad Request**: La solicitud contiene datos inválidos o falta información requerida.
-- **401 Unauthorized**: No se ha proporcionado autenticación o es inválida.
-- **403 Forbidden**: El usuario no tiene permisos para acceder al recurso.
-- **404 Not Found**: El recurso solicitado no existe.
-- **409 Conflict**: La solicitud no puede completarse debido a un conflicto con el estado actual del recurso.
-- **500 Internal Server Error**: Error interno del servidor.
+**Request**:
+```bash
+curl -X POST http://localhost:4000/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "userType": "ADMIN",
+    "DNI": "11223344",
+    "Name": "Ana",
+    "Lastname": "Martínez",
+    "Email": "ana.martinez@hospital.com",
+    "password": "AdminPass123",
+    "Phone_number": "+57300123456"
+  }'
+```
+
+**Response**:
+```json
+{
+  "message": "Usuario creado exitosamente",
+  "user": {
+    "id": 4,
+    "dni": "11223344", 
+    "userType": "ADMIN",
+    "email": "ana.martinez@hospital.com",
+    "name": "Ana",
+    "lastname": "Martínez"
+  }
+}
+```
+
+### Ejemplo 2: Crear Médico
+
+**Request**:
+```bash
+curl -X POST http://localhost:4000/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "userType": "MEDIC",
+    "DNI": "55667788",
+    "Name": "Dr. Carlos",
+    "Lastname": "González",
+    "email": "carlos.gonzalez@hospital.com",
+    "password": "MedicPass123",
+    "phone_number": "+57301234567",
+    "gender": "MALE",
+    "Birthdate": "1980-05-15T00:00:00.000Z",
+    "specialty": "Cardiología",
+    "schedule": "Lunes a Viernes 8:00-16:00"
+  }'
+```
+
+**Response**:
+```json
+{
+  "message": "Usuario creado exitosamente",
+  "user": {
+    "id": 4,
+    "dni": "55667788",
+    "userType": "MEDIC", 
+    "email": "carlos.gonzalez@hospital.com",
+    "name": "Dr. Carlos",
+    "lastname": "González"
+  }
+}
+```
+
+### Ejemplo 3: Crear Paciente
+
+**Request**:
+```bash
+curl -X POST http://localhost:4000/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "userType": "PATIENT",
+    "DNI": "99887766",
+    "Name": "María",
+    "Lastname": "López",
+    "email": "maria.lopez@email.com",
+    "password": "PatientPass123",
+    "phone_number": "+57302345678",
+    "gender": "FEMALE",
+    "Birthdate": "1992-08-20T00:00:00.000Z",
+    "address": "Calle 123 #45-67, Bogotá"
+  }'
+```
+
+**Response**:
+```json
+{
+  "message": "Usuario creado exitosamente",
+  "user": {
+    "id": 4,
+    "dni": "99887766",
+    "userType": "PATIENT",
+    "email": "maria.lopez@email.com", 
+    "name": "María",
+    "lastname": "López"
+  }
+}
+```
+
+### Ejemplo 4: Error de validación
+
+**Request con datos inválidos**:
+```bash
+curl -X POST http://localhost:4000/admin/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  -d '{
+    "userType": "MEDIC",
+    "DNI": "123",
+    "Name": "",
+    "password": "123"
+  }'
+```
+
+**Response**:
+```json
+{
+  "statusCode": 400,
+  "message": [
+    "Name should not be empty",
+    "Lastname should not be empty", 
+    "password must be longer than or equal to 8 characters"
+  ],
+  "error": "Bad Request"
+}
+```
+
+---
+
+## Estructura de Base de Datos
+
+### Tabla: admins
+```sql
+ID_Admins    SERIAL PRIMARY KEY
+Name         VARCHAR NOT NULL
+Lastname     VARCHAR NOT NULL  
+Email        VARCHAR UNIQUE NOT NULL
+passwordHash VARCHAR NOT NULL
+createdAt    TIMESTAMP DEFAULT NOW()
+updatedAt    TIMESTAMP DEFAULT NOW()
+Phone_number VARCHAR
+DNI          VARCHAR UNIQUE NOT NULL
+```
+
+### Tabla: medics
+```sql
+ID_medics     SERIAL PRIMARY KEY
+DNI           VARCHAR UNIQUE NOT NULL
+Name          VARCHAR NOT NULL
+Lastname      VARCHAR NOT NULL
+Birthdate     TIMESTAMP NOT NULL
+gender        Gender NOT NULL
+phone_number  VARCHAR
+email         VARCHAR UNIQUE NOT NULL
+passwordHash  VARCHAR NOT NULL
+specialty     VARCHAR
+schedule      VARCHAR
+createdAt     TIMESTAMP DEFAULT NOW()
+updatedAt     TIMESTAMP DEFAULT NOW()
+create        INTEGER REFERENCES admins(ID_Admins)
+```
+
+### Tabla: patients
+```sql
+ID_Patients   SERIAL PRIMARY KEY
+DNI           VARCHAR UNIQUE NOT NULL
+Name          VARCHAR NOT NULL
+Lastname      VARCHAR NOT NULL
+Birthdate     TIMESTAMP NOT NULL
+gender        Gender NOT NULL
+phone_number  VARCHAR
+email         VARCHAR UNIQUE NOT NULL
+passwordHash  VARCHAR NOT NULL
+address       VARCHAR
+createdAt     TIMESTAMP DEFAULT NOW()
+updatedAt     TIMESTAMP DEFAULT NOW()
+create        INTEGER REFERENCES admins(ID_Admins)
+```
+
+### Enum: Gender
+```sql
+MALE | FEMALE | OTHER
+```
+
+---
+
+## Flujo de Creación de Usuario
+
+1. **Validación de autenticación**: Verificar JWT token válido
+2. **Validación de datos**: Validar estructura y tipos de datos con class-validator
+3. **Verificación de duplicados**: Comprobar que el DNI no exista en el sistema
+4. **Hash de contraseña**: Encriptar la contraseña con bcrypt (salt rounds: 10)
+5. **Creación en base de datos**: Insertar el usuario en la tabla correspondiente
+6. **Respuesta**: Retornar datos del usuario (sin passwordHash)
+
+---
+
+## Consideraciones Técnicas
+
+### Seguridad
+- **Hash de contraseñas**: bcrypt con 10 salt rounds
+- **Autenticación**: JWT requerido para todos los endpoints
+- **Validación**: class-validator para validación automática
+- **Datos sensibles**: passwordHash nunca se incluye en respuestas
+
+### Relaciones de Base de Datos
+- Los médicos y pacientes requieren un administrador que los cree (campo `create`)
+- Se utiliza el primer administrador disponible si no se especifica uno
+
+### Manejo de Errores
+- Errores de validación (400): Datos incorrectos o faltantes
+- Errores de conflicto (409): DNI duplicado
+- Errores de autorización (401): Token inválido o faltante
+- Errores internos (500): Problemas de base de datos o servidor
+
+### Flexibilidad de Campos
+El sistema maneja diferencias en nombres de campos entre tipos de usuario:
+- `Email` vs `email`
+- `Phone_number` vs `phone_number`
+
+---
+
+## Testing
+
+### Credenciales de Prueba
+Para testing, existe un administrador con las siguientes credenciales:
+- **DNI**: `12345678`
+- **Password**: `admin123`
+
+### Obtener Token JWT
+```bash
+curl -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"dni":"12345678","password":"admin123"}'
+```
+
+### Usar Token en Requests
+```bash
+# Usar el access_token obtenido del login
+curl -X POST http://localhost:4000/admin/users \
+  -H "Authorization: Bearer <access_token>" \
+  -H "Content-Type: application/json" \
+  -d '{ ... }'
+```
+
+---
+
+## Notas de Implementación
+
+### Campos Opcionales vs Requeridos
+- **Siempre requeridos**: `userType`, `DNI`, `Name`, `Lastname`, `password`
+- **Requeridos para MEDIC/PATIENT**: `gender`, `Birthdate`
+- **Opcionales**: `Email/email`, `Phone_number/phone_number`, `specialty`, `schedule`, `address`
+
+### Formato de Fechas
+Las fechas deben enviarse en formato ISO 8601:
+```
+"Birthdate": "1990-07-22T00:00:00.000Z"
+```
+
+### Limitaciones Actuales
+- Solo se puede crear usuarios, no hay endpoints para listar, actualizar o eliminar
+- Los médicos y pacientes se asocian automáticamente al primer administrador disponible
+- No hay validación de roles específicos más allá de requerir ser administrador

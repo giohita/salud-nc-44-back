@@ -14,6 +14,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -96,5 +98,20 @@ export class AuthController {
 
     res.clearCookie('refresh_token', { path: '/auth/refresh' });
     return { ok: true };
+  }
+
+  @Post('forgot')
+  @HttpCode(HttpStatus.OK)
+  async forgot(@Body() dto: ForgotPasswordDto) {
+    const { resetToken } = await this.authService.requestPasswordReset(dto.dni);
+    // Nota: en producción se enviaría por email/SMS. En desarrollo lo devolvemos.
+    return { reset_token: resetToken };
+  }
+
+  @Post('reset')
+  @HttpCode(HttpStatus.OK)
+  async reset(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Contraseña actualizada correctamente' };
   }
 }
