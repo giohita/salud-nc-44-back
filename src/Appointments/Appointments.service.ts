@@ -1,29 +1,39 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateAppointmentDto) {
-    const conflict = await this.prisma.appointments.findFirst({
-      where: {
-        ID_medics: dto.ID_medics,
-        appointmentDatetime: new Date(dto.appointmentDatetime),
-      },
+  create(data: CreateAppointmentDto) {
+    return this.prisma.appointments.create({ data });
+  }
+
+  findAll() {
+    return this.prisma.appointments.findMany({
+      include: { patient: true, medic: true },
     });
+  }
 
-    if (conflict) {
-      throw new ConflictException('El médico ya tiene una cita en ese horario');
-    }
+  findOne(id: number) {
+    return this.prisma.appointments.findUnique({
+      where: { ID_Appointments: id },
+      include: { patient: true, medic: true },
+    });
+  }
 
-    return this.prisma.appointments.create({
-      data: {
-        ...dto,
-        status: 'PENDING',
-        reminderSent: false,
-      },
+  update(id: number, data: UpdateAppointmentDto) {
+    return this.prisma.appointments.update({
+      where: { ID_Appointments: id },
+      data,
+    });
+  }
+
+  remove(id: number) {
+    return this.prisma.appointments.delete({
+      where: { ID_Appointments: id },
     });
   }
 }

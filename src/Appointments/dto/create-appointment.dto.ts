@@ -13,6 +13,9 @@ export class CreateAppointmentDto {
   @IsDateString()
   appointmentDatetime: string;
 
+  @IsString()
+  status: string;
+
   @IsOptional()
   @IsString()
   notes?: string;
