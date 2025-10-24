@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, InternalServerErrorException, Logger } f
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
 import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
+import { TransferClinicalRecordDto } from './dto/tranfers-clinical-record.dto';
 import { Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
@@ -178,4 +179,43 @@ export class ClinicalRecordsService {
       );
     }
   }
+
+  // Transferencia del record medico entre doctores
+
+  async TransferClinicalRecordDto(id: number, dto: TransferClinicalRecordDto) {
+    try {
+      this.logger.log(`Iniciando transferencia del registro clinico ${id} al medico ${dto.newMedId}`)
+
+      const record = await this.prisma.clinical_data.findUnique({
+        where: { ID_Clinical_data: id },
+      });
+      if (!record){
+        throw new NotFoundException(`Registro clinico con id %{id} no encontrado`);
+      }
+      const medicExist = await this.prisma.medics.findUnique({
+        where: { ID_medics: dto.newMedId },
+      });
+      if (!medicExist){
+        throw new NotFoundException(`Medico con Id ${dto.newMedId} no encontrado`);
+      }
+      const updateRecord = await this.prisma.clinical_data.update({
+        where: { ID_Clinical_data: id},
+        data: { ID_medics: dto.newMedId },
+        include: {
+          patient: true,
+          medic: true,
+          admin: true,
+        },
+      });
+      this.logger.log(`Transferencia completa: registro ${id} Asignado al medico ${dto.newMedId}`);
+      return updateRecord;
+    } catch (error) {
+      this.logger.error(`Error al transferir el registro clinico: ${error.message}`, error.stack);
+
+      throw new InternalServerErrorException(
+        `Error al transferir el registro clinico. Por favor, Verifica los datos e intente nuevamente`,
+      );
+    }
+  }
 }
+

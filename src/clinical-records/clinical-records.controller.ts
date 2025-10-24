@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Put, Param, ParseIntPipe, Res, Header } from '@nestjs/common';
+import { Controller, Patch, Get, Post, Body, Put, Param, ParseIntPipe, Res, Header } from '@nestjs/common';
 import { ClinicalRecordsService } from './clinical-records.service';
 import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
 import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
+import { TransferClinicalRecordDto } from './dto/tranfers-clinical-record.dto';
 import type { Response } from 'express';
 
 @Controller('records')
@@ -39,5 +40,14 @@ export class ClinicalRecordsController {
     });
     
     res.send(fileBuffer);
+  }
+
+  // ruta de la transferencia
+  @Patch(':id/transfer')
+  transferRecord(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: TransferClinicalRecordDto,
+  ) {
+    return this.clinicalRecordsService.TransferClinicalRecordDto(id, dto)
   }
 }
