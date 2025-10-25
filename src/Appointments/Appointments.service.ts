@@ -11,7 +11,7 @@ export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
 
-  // Crear Usuario
+  // Crear Agenda
   async create(CreateAppointmentDto: CreateAppointmentDto) {
     try {
       this.logger.log(`Intentando crear cita para paciente ${CreateAppointmentDto.ID_Patients} con el doctor ${CreateAppointmentDto.ID_medics}`);
@@ -37,7 +37,7 @@ export class AppointmentsService {
   }
 
 
-  // Buscar usuario
+  // Buscar Agenda
   findAll() {
     return this.prisma.appointments.findMany({
       include: { patient: true, medic: true },
@@ -63,7 +63,7 @@ export class AppointmentsService {
     }
   }
 
-  // Actualizar datos
+  // Actualizar datos de agenda
   update(id: number, data: UpdateAppointmentDto) {
     return this.prisma.appointments.update({
       where: { ID_Appointments: id },
