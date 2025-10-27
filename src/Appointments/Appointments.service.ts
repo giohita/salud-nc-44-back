@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { AppointmentStatus, Prisma } from '@prisma/client';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { tr } from 'date-fns/locale';
 
 @Injectable()
 export class AppointmentsService {
@@ -11,14 +12,15 @@ export class AppointmentsService {
   constructor(private prisma: PrismaService) {}
 
 
-  // Crear Agenda
+  // Crear cita
   async create(CreateAppointmentDto: CreateAppointmentDto) {
     try {
       this.logger.log(`Intentando crear cita para paciente ${CreateAppointmentDto.ID_Patients} con el doctor ${CreateAppointmentDto.ID_medics}`);
-
+      const status = CreateAppointmentDto.status ?? AppointmentStatus.CONFIRMED;
       return await this.prisma.appointments.create({
         data: {
           ...CreateAppointmentDto,
+          status,
         },
       });
     } catch (error) {
@@ -37,10 +39,31 @@ export class AppointmentsService {
   }
 
 
-  // Buscar Agenda
+  // Buscar cita
   findAll() {
     return this.prisma.appointments.findMany({
-      include: { patient: true, medic: true },
+      select: {
+        status:true,
+        notes: true,
+        appointmentDatetime: true,
+        appointmentType: true,
+
+        patient:{
+          select: {
+            Name: true,
+            Lastname: true,
+            Birthdate: true,
+            DNI: true
+          },
+        },
+        medic: {
+          select: {
+            Name: true,
+            Lastname: true,
+            specialty: true,
+          }
+        }
+      }
     });
   }
 
@@ -63,7 +86,7 @@ export class AppointmentsService {
     }
   }
 
-  // Actualizar datos de agenda
+  // Actualizar datos de cita
   update(id: number, data: UpdateAppointmentDto) {
     return this.prisma.appointments.update({
       where: { ID_Appointments: id },
@@ -79,3 +102,5 @@ export class AppointmentsService {
     });
   }
 }
+
+
