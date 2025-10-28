@@ -278,6 +278,17 @@ curl -X GET http://localhost:3000/records/1/download \
   -o registro_clinico.pdf
 ```
 
+### 5. Actualizar un solo dato 
+```bash
+PATCH http://localhost:3000/records/1/transfer \
+Content-Type: application/json
+
+{
+  "newMedicId": 5
+}
+```
+
+
 ## Manejo de Errores
 
 ### Errores Comunes
