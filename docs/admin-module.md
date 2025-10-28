@@ -114,7 +114,7 @@ El módulo implementa un guard personalizado (`AdminRoleGuard`) que:
   Email: string;            // Email (requerido, único, formato válido)
   password: string;         // Contraseña (requerido, mínimo 8 caracteres)
   Phone_number?: string;    // Teléfono (opcional)
-  gender: Gender;           // Género (requerido para MEDIC y PATIENT)
+  gender?: Gender;          // Género (requerido para MEDIC y PATIENT, opcional para ADMIN)
   userType: 'ADMIN' | 'MEDIC' | 'PATIENT';  // Tipo de usuario (requerido)
 }
 ```
@@ -123,7 +123,7 @@ El módulo implementa un guard personalizado (`AdminRoleGuard`) que:
 - **Email:** Formato válido y único en el sistema
 - **DNI:** Único en el sistema
 - **Contraseña:** Mínimo 8 caracteres
-- **Género:** Requerido para médicos y pacientes, opcional para administradores
+- **Género:** Requerido para médicos y pacientes, no se incluye para administradores
 - **Tipo de usuario:** Debe ser uno de los valores permitidos
 
 ## Servicios

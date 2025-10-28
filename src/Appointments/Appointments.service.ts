@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Logger, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AppointmentStatus, Prisma } from '@prisma/client';
+import { Prisma, AppointmentStatus } from '@prisma/client';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { tr } from 'date-fns/locale';

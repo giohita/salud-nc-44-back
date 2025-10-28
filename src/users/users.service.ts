@@ -12,6 +12,7 @@ export type FoundUser = {
   email?: string;
   name?: string;
   lastname?: string;
+  gender?: string;
 };
 
 @Injectable()
@@ -44,6 +45,7 @@ export class UsersService {
         email: medic.email,
         name: medic.Name,
         lastname: medic.Lastname,
+        gender: medic.gender,
       };
     }
 
@@ -58,6 +60,7 @@ export class UsersService {
         email: patient.email,
         name: patient.Name,
         lastname: patient.Lastname,
+        gender: patient.gender,
       };
     }
 
@@ -134,6 +137,7 @@ export class UsersService {
             email: medic.email,
             name: medic.Name,
             lastname: medic.Lastname,
+            gender: medic.gender,
           };
 
         case 'PATIENT':
@@ -169,6 +173,7 @@ export class UsersService {
             email: patient.email,
             name: patient.Name,
             lastname: patient.Lastname,
+            gender: patient.gender,
           };
 
         default:
