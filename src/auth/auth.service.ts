@@ -10,6 +10,9 @@ type JwtPayload = {
   sub: number;
   dni: string;
   userType: 'ADMIN' | 'MEDIC' | 'PATIENT';
+  name?: string,
+  lastname?: string,
+  gender?: string
 };
 
 @Injectable()
@@ -36,6 +39,9 @@ export class AuthService {
       sub: user.id,
       dni: user.dni,
       userType: user.userType,
+      name: user.name,
+      lastname: user.lastname,
+      gender: user.gender,
     };
   }
 

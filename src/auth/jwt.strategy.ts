@@ -7,6 +7,9 @@ type JwtPayload = {
   sub: number;
   dni: string;
   userType: 'ADMIN' | 'MEDIC' | 'PATIENT';
+  name?: string;
+  lastname?: string;
+  gender?: string;
 };
 
 @Injectable()
@@ -23,6 +26,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: payload.sub,
       dni: payload.dni,
       userType: payload.userType,
+      name: payload.name,
+      lastname: payload.lastname,
+      gender: payload.gender,
     };
   }
 }

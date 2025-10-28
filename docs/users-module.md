@@ -145,8 +145,11 @@ src/users/
   email?: string;                           // Email del usuario
   name?: string;                            // Nombre del usuario
   lastname?: string;                        // Apellido del usuario
+  gender?: string;                          // Género (solo para MEDIC y PATIENT)
 }
 ```
+
+**Nota:** El campo `gender` solo está presente para usuarios de tipo `MEDIC` y `PATIENT`. Los usuarios `ADMIN` no incluyen este campo.
 
 ## Validaciones de Entrada
 

@@ -60,10 +60,13 @@ src/auth/
     "Lastname": "Pérez",
     "DNI": "12345678",
     "Email": "juan@email.com",
-    "userType": "PATIENT"
+    "userType": "PATIENT",
+    "gender": "MALE"
   }
 }
 ```
+
+**Nota:** El campo `gender` solo aparece en la respuesta para usuarios de tipo `MEDIC` y `PATIENT`. Los usuarios `ADMIN` no incluyen este campo.
 
 **Cookies establecidas:**
 - `access_token`: Token JWT de acceso (15 min)
@@ -132,6 +135,23 @@ src/auth/
 - **Secret:** Configurado via variables de entorno
 - **Duración Access Token:** 15 minutos
 - **Duración Refresh Token:** 7 días
+
+### JWT Payload
+El token JWT incluye la siguiente información del usuario:
+```typescript
+{
+  sub: number;           // ID del usuario
+  dni: string;           // DNI del usuario
+  userType: string;      // Tipo: 'ADMIN' | 'MEDIC' | 'PATIENT'
+  name?: string;         // Nombre (opcional)
+  lastname?: string;     // Apellido (opcional)
+  gender?: string;       // Género (solo para MEDIC y PATIENT)
+  iat: number;          // Timestamp de emisión
+  exp: number;          // Timestamp de expiración
+}
+```
+
+**Nota:** El campo `gender` solo se incluye para usuarios de tipo `MEDIC` y `PATIENT`. Los usuarios `ADMIN` no tienen este campo en su payload.
 
 ### Configuración de Cookies
 ```typescript
