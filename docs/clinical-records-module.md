@@ -149,6 +149,47 @@ Content-Type: application/pdf
 Content-Disposition: attachment; filename="registro_clinico_1_20240115_103000.pdf"
 ```
 
+### PATCH /records/:id/transfer
+**Descripción:** Transfiere un registro clínico a otro médico.
+
+**Parámetros:**
+- `id` (number): ID del registro clínico
+
+**Request Body:**
+```json
+{
+  "newMedId": 5
+}
+```
+
+**Response:**
+```json
+{
+  "ID_Clinical_data": 1,
+  "ID_Patients": 1,
+  "type": "Examen de Laboratorio",
+  "code": "LAB001",
+  "value": "120",
+  "unit": "mg/dL",
+  "severity": "Normal",
+  "effectiveDate": "2024-01-15T10:30:00.000Z",
+  "ID_medics": 5,
+  "create": 1,
+  "patient": {
+    "Name": "Juan",
+    "Lastname": "Pérez"
+  },
+  "medic": {
+    "Name": "Dr. Carlos",
+    "Lastname": "Rodríguez"
+  },
+  "admin": {
+    "Name": "Admin",
+    "Lastname": "Sistema"
+  }
+}
+```
+
 ## Modelo de Datos
 
 ### CreateClinicalRecordDto
@@ -181,6 +222,13 @@ Content-Disposition: attachment; filename="registro_clinico_1_20240115_103000.pd
   fhirData?: string;
   ID_medics?: number;
   create?: number;
+}
+```
+
+### TransferClinicalRecordDto
+```typescript
+{
+  newMedId: number;  // ID del nuevo médico (requerido)
 }
 ```
 
@@ -227,6 +275,87 @@ Content-Disposition: attachment; filename="registro_clinico_1_20240115_103000.pd
 - Formato estructurado con marca de tiempo
 - Incluye advertencias de confidencialidad
 
+#### `TransferClinicalRecordDto(id, dto)`
+- Transfiere un registro clínico a otro médico
+- Valida existencia del registro y del nuevo médico
+- Actualiza la asignación del médico responsable
+- Registra la operación en logs para auditoría
+
+## Implementación Técnica de PDF
+
+### Generación de Reportes PDF
+
+El sistema utiliza **PDFKit** para generar reportes profesionales de registros clínicos. La implementación incluye:
+
+#### Características del PDF Generado
+- **Formato profesional** con encabezados y secciones estructuradas
+- **Información completa** del paciente, médico y registro clínico
+- **Marca de tiempo** de generación del documento
+- **Advertencias de confidencialidad** médica
+- **Nombre de archivo único** con timestamp
+
+#### Estructura del Documento PDF
+```
+REGISTRO CLÍNICO
+================
+
+Información del Paciente
+- Nombre: [Nombre del paciente]
+- ID: [ID del paciente]
+
+Información del Médico
+- Nombre: [Nombre del médico]
+- ID: [ID del médico]
+
+Detalles del Registro
+- Tipo: [Tipo de registro]
+- Código: [Código médico]
+- Valor: [Valor del registro]
+- Unidad: [Unidad de medida]
+- Severidad: [Nivel de severidad]
+- Fecha: [Fecha efectiva]
+
+Información de Creación
+- Creado por: [Nombre del administrador]
+- ID de creación: [ID del creador]
+
+Pie de Página
+- Fecha de generación
+- Advertencia de confidencialidad
+```
+
+#### Proceso de Generación
+1. **Validación:** Verifica existencia del registro clínico
+2. **Consulta de datos:** Obtiene información completa con relaciones
+3. **Creación del documento:** Utiliza PDFKit para generar el PDF
+4. **Formateo:** Aplica estilos y estructura profesional
+5. **Buffer de salida:** Convierte a buffer para descarga
+6. **Nomenclatura:** Genera nombre único con timestamp
+
+#### Configuración Técnica
+```typescript
+// Configuración del documento PDF
+const doc = new PDFDocument({ 
+  margin: 50,
+  size: 'A4',
+  info: {
+    Title: 'Registro Clínico',
+    Author: 'Sistema de Salud NC-44',
+    Subject: 'Historia Clínica',
+    Creator: 'Clinical Records Module'
+  }
+});
+
+// Formato de nombre de archivo
+const fileName = `registro_clinico_${id}_${format(new Date(), 'yyyyMMdd_HHmmss')}.pdf`;
+```
+
+#### Manejo de Errores en PDF
+- **Registro no encontrado:** Error 404 con mensaje específico
+- **Error de generación:** Error 500 con logging detallado
+- **Datos faltantes:** Manejo graceful con valores por defecto
+- **Memoria insuficiente:** Control de recursos y cleanup automático
+
 ## Integración con el Sistema
 
 ### Relaciones de Base de Datos
@@ -235,9 +364,33 @@ Content-Disposition: attachment; filename="registro_clinico_1_20240115_103000.pd
 - **Administradores:** Relación con tabla `admins`
 
 ### Dependencias del Módulo
-- **PrismaModule:** Para acceso a base de datos
-- **PDFKit:** Para generación de reportes PDF
-- **date-fns:** Para formateo de fechas
+- **PrismaModule:** Para acceso a base de datos y gestión de relaciones
+- **PDFKit:** Librería para generación de documentos PDF profesionales
+- **date-fns:** Utilidad para formateo y manipulación de fechas
+- **@nestjs/common:** Decoradores y utilidades de NestJS
+- **class-validator:** Validación de DTOs y datos de entrada
+- **class-transformer:** Transformación de objetos y tipos
+
+### Instalación de Dependencias PDF
+```bash
+# Dependencias principales para PDF
+npm install pdfkit
+npm install @types/pdfkit --save-dev
+
+# Dependencias para formateo de fechas
+npm install date-fns
+
+# Dependencias para manejo de streams (si es necesario)
+npm install @types/node --save-dev
+```
+
+### Configuración de Tipos TypeScript
+```typescript
+// En el archivo de servicio
+import PDFDocument from 'pdfkit';
+import { format } from 'date-fns';
+import type { Response } from 'express';
+```
 
 ## Casos de Uso
 
@@ -278,14 +431,13 @@ curl -X GET http://localhost:3000/records/1/download \
   -o registro_clinico.pdf
 ```
 
-### 5. Actualizar un solo dato 
+### 5. Transferir Registro a Otro Médico
 ```bash
-PATCH http://localhost:3000/records/1/transfer \
-Content-Type: application/json
-
-{
-  "newMedicId": 5
-}
+curl -X PATCH http://localhost:3000/records/1/transfer \
+  -H "Content-Type: application/json" \
+  -d '{
+    "newMedId": 5
+  }'
 ```
 
 
