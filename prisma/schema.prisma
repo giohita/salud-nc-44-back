@@ -75,13 +75,20 @@ model Patients {
   Clinical_data Clinical_data[]
 }
 
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
 model Appointments {
   ID_Appointments    Int       @id @default(autoincrement())
   ID_Patients        Int
   ID_medics          Int
   appointmentType    String
   appointmentDatetime DateTime
-  status             String
+  status AppointmentStatus @default(PENDING)
   notes              String?
   reminderSent       Boolean   @default(false)
   createdAt          DateTime  @default(now())

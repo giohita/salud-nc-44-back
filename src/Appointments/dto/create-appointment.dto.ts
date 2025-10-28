@@ -1,5 +1,5 @@
-import { IsInt, IsString, IsDateString, IsOptional } from 'class-validator';
-
+import { IsInt, IsString, IsDateString, IsOptional, IsEnum } from 'class-validator';
+import { AppointmentStatus } from '@prisma/client';
 export class CreateAppointmentDto {
   @IsInt()
   ID_Patients: number;
@@ -13,8 +13,11 @@ export class CreateAppointmentDto {
   @IsDateString()
   appointmentDatetime: string;
 
-  @IsString()
-  status: string;
+  // @IsString()
+  // status: string;
+@IsOptional()
+@IsEnum(AppointmentStatus)
+status?: AppointmentStatus
 
   @IsOptional()
   @IsString()
