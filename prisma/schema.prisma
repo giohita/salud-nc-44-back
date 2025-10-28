@@ -50,8 +50,9 @@ model Medics {
   create        Int
   admin         Admins    @relation("AdminCreatesMedics", fields: [create], references: [ID_Admins])
 
-  Appointments  Appointments[]
-  Clinical_data Clinical_data[]
+  Appointments      Appointments[]
+  Clinical_data     Clinical_data[]
+  Teleconsultations Teleconsultations[]
 }
 
 model Patients {
@@ -71,8 +72,9 @@ model Patients {
   create        Int
   admin         Admins    @relation("AdminCreatesPatients", fields: [create], references: [ID_Admins])
 
-  Appointments  Appointments[]
-  Clinical_data Clinical_data[]
+  Appointments      Appointments[]
+  Clinical_data     Clinical_data[]
+  Teleconsultations Teleconsultations[]
 }
 
 enum AppointmentStatus {
@@ -80,6 +82,19 @@ enum AppointmentStatus {
   CONFIRMED
   COMPLETED
   CANCELLED
+}
+
+enum TeleconsultationType {
+  WEBRTC
+  EMERGENCY
+}
+
+enum TeleconsultationStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FAILED
 }
 
 model Appointments {
@@ -95,8 +110,32 @@ model Appointments {
   updatedAt          DateTime  @updatedAt
 
   // Relaciones
-  patient Patients @relation(fields: [ID_Patients], references: [ID_Patients])
-  medic   Medics   @relation(fields: [ID_medics], references: [ID_medics])
+  patient           Patients            @relation(fields: [ID_Patients], references: [ID_Patients])
+  medic             Medics              @relation(fields: [ID_medics], references: [ID_medics])
+  Teleconsultations Teleconsultations[]
+}
+
+model Teleconsultations {
+  id              Int                     @id @default(autoincrement())
+  patientId       Int
+  medicId         Int
+  appointmentId   Int?
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  endedAt         DateTime?
+  type            TeleconsultationType    @default(WEBRTC)
+  status          TeleconsultationStatus  @default(SCHEDULED)
+  sessionId       String?
+  roomId          String?
+  notes           String?
+  emergencyReason String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  // Relaciones
+  patient     Patients      @relation(fields: [patientId], references: [ID_Patients])
+  medic       Medics        @relation(fields: [medicId], references: [ID_medics])
+  appointment Appointments? @relation(fields: [appointmentId], references: [ID_Appointments])
 }
 
 model Clinical_data {

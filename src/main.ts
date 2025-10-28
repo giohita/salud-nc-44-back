@@ -14,9 +14,18 @@ async function bootstrap() {
     forbidNonWhitelisted: true,
   }));
 
-  // Habilitar CORS para localhost:3001
+  // Habilitar CORS para múltiples orígenes
   app.enableCors({
-    origin: 'http://localhost:3001',
+    origin: [
+      'http://localhost:3001',
+      'http://localhost:3000', 
+      'http://localhost:8080',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:5500',
+      'null' // Para archivos abiertos directamente (file://)
+    ],
     credentials: true, // si necesitas enviar cookies o autenticación
   });
 
