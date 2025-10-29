@@ -3,6 +3,15 @@ import { ClinicalRecordsService } from './clinical-records.service';
 import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
 import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
 import { TransferClinicalRecordDto } from './dto/tranfers-clinical-record.dto';
+import { 
+  SyncPatientToFhirDto, 
+  ImportPatientFromFhirDto 
+} from './dto/fhir-patient.dto';
+import { 
+  SyncClinicalRecordToFhirDto, 
+  ImportObservationFromFhirDto,
+  FhirServerConfigDto 
+} from './dto/fhir-observation.dto';
 import type { Response } from 'express';
 
 @Controller('records')
@@ -49,5 +58,59 @@ export class ClinicalRecordsController {
     @Body() dto: TransferClinicalRecordDto,
   ) {
     return this.clinicalRecordsService.TransferClinicalRecordDto(id, dto)
+  }
+
+  // ==================== ENDPOINTS FHIR ====================
+
+  /**
+   * Configura un servidor FHIR para integración
+   */
+  @Post('fhir/configure-server')
+  configureFhirServer(@Body() config: FhirServerConfigDto) {
+    return this.clinicalRecordsService.configureFhirServer(config);
+  }
+
+  /**
+   * Sincroniza un paciente local con un servidor FHIR
+   */
+  @Post('fhir/sync-patient')
+  syncPatientToFhir(@Body() dto: SyncPatientToFhirDto) {
+    return this.clinicalRecordsService.syncPatientToFhir(dto);
+  }
+
+  /**
+   * Sincroniza un registro clínico con un servidor FHIR como Observation
+   */
+  @Post('fhir/sync-record')
+  syncClinicalRecordToFhir(@Body() dto: SyncClinicalRecordToFhirDto) {
+    return this.clinicalRecordsService.syncClinicalRecordToFhir(dto);
+  }
+
+  /**
+   * Importa una observación desde un servidor FHIR
+   */
+  @Post('fhir/import-observation')
+  importObservationFromFhir(@Body() dto: ImportObservationFromFhirDto) {
+    return this.clinicalRecordsService.importObservationFromFhir(dto);
+  }
+
+  /**
+   * Obtiene todos los registros clínicos con datos FHIR
+   */
+  @Get('fhir/records-with-fhir')
+  getClinicalRecordsWithFhir() {
+    return this.clinicalRecordsService.getClinicalRecordsWithFhir();
+  }
+
+  /**
+   * Obtiene un registro clínico específico con sus datos FHIR
+   */
+  @Get(':id/fhir')
+  async getClinicalRecordWithFhir(@Param('id', ParseIntPipe) id: number) {
+    const record = await this.clinicalRecordsService.findOne(id);
+    return {
+      ...record,
+      fhirData: record.fhirData ? JSON.parse(record.fhirData as string) : null
+    };
   }
 }
