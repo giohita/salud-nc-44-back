@@ -7,9 +7,10 @@ import { AdminModule } from './admin/admin.module';
 import { AppointmentsModule  } from './Appointments/Appointments.module';
 import { AgendaConfigModule } from './agenda-config/agenda-config.module';
 import { TeleconsultationModule } from './teleconsultation/teleconsultation.module';
+import { MedicsModule } from './medics/medics.module';
 
 @Module({
-  imports: [PrismaModule, ClinicalRecordsModule, AuthModule, UsersModule, AdminModule, AppointmentsModule, AgendaConfigModule, TeleconsultationModule],
+  imports: [PrismaModule, ClinicalRecordsModule, AuthModule, UsersModule, AdminModule, AppointmentsModule, AgendaConfigModule, TeleconsultationModule, MedicsModule],
   controllers: [],
   providers: [],
 })
