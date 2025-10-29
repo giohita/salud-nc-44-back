@@ -1,8 +1,21 @@
-import { Injectable, NotFoundException, InternalServerErrorException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, InternalServerErrorException, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateClinicalRecordDto } from './dto/create-clinical-record.dto';
 import { UpdateClinicalRecordDto } from './dto/update-clinical-record.dto';
 import { TransferClinicalRecordDto } from './dto/tranfers-clinical-record.dto';
+import { 
+  FhirPatientDto, 
+  FhirGender, 
+  SyncPatientToFhirDto, 
+  ImportPatientFromFhirDto 
+} from './dto/fhir-patient.dto';
+import { 
+  FhirObservationDto, 
+  FhirObservationStatus, 
+  SyncClinicalRecordToFhirDto, 
+  ImportObservationFromFhirDto,
+  FhirServerConfigDto 
+} from './dto/fhir-observation.dto';
 import { Prisma } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
@@ -10,8 +23,17 @@ import { format } from 'date-fns';
 @Injectable()
 export class ClinicalRecordsService {
   private readonly logger = new Logger(ClinicalRecordsService.name);
+  private fhirServers: Map<string, FhirServerConfigDto> = new Map();
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+    // Configuración por defecto de servidor FHIR
+    this.fhirServers.set('default', {
+      name: 'Servidor FHIR Local',
+      baseUrl: 'http://localhost:8080/fhir',
+      version: 'R4',
+      authType: 'none'
+    });
+  }
 
   async create(createClinicalRecordDto: CreateClinicalRecordDto) {
     try {
@@ -218,4 +240,443 @@ export class ClinicalRecordsService {
     }
   }
 }
+
+
+// ==================== FUNCIONALIDADES FHIR ====================
+
+/**
+ * Configura un servidor FHIR para integración
+ */
+async configureFhirServer(config: FhirServerConfigDto): Promise<void> {
+  try {
+    this.logger.log(`Configurando servidor FHIR: ${config.name}`);
+    
+    // Validar conectividad del servidor FHIR
+    const isConnected = await this.testFhirConnection(config.baseUrl);
+    if (!isConnected) {
+      throw new BadRequestException(`No se puede conectar al servidor FHIR: ${config.baseUrl}`);
+    }
+
+    this.fhirServers.set(config.name, config);
+    this.logger.log(`Servidor FHIR configurado exitosamente: ${config.name}`);
+  } catch (error) {
+    this.logger.error(`Error al configurar servidor FHIR: ${error.message}`, error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Convierte un paciente local a formato FHIR
+ */
+private async convertPatientToFhir(patientId: number): Promise<FhirPatientDto> {
+  const patient = await this.prisma.patients.findUnique({
+    where: { ID_Patients: patientId }
+  });
+
+  if (!patient) {
+    throw new NotFoundException(`Paciente con ID ${patientId} no encontrado`);
+  }
+
+  const fhirPatient: FhirPatientDto = {
+    resourceType: 'Patient',
+    id: patient.ID_Patients.toString(),
+    identifier: [{
+      use: 'official',
+      system: 'http://salud-nc.com/patient-id',
+      value: patient.DNI,
+      type: 'DNI'
+    }],
+    active: true,
+    name: [{
+      use: 'official',
+      family: patient.Lastname,
+      given: [patient.Name],
+      text: `${patient.Name} ${patient.Lastname}`
+    }],
+    telecom: patient.phone_number ? [{
+      system: 'phone',
+      value: patient.phone_number,
+      use: 'mobile'
+    }] : undefined,
+    gender: this.mapGenderToFhir(patient.gender),
+    birthDate: patient.Birthdate.toISOString().split('T')[0],
+    address: patient.address ? [{
+      use: 'home',
+      type: 'physical',
+      text: patient.address
+    }] : undefined
+  };
+
+  if (patient.email) {
+    fhirPatient.telecom = fhirPatient.telecom || [];
+    fhirPatient.telecom.push({
+      system: 'email',
+      value: patient.email,
+      use: 'home'
+    });
+  }
+
+  return fhirPatient;
+}
+
+/**
+ * Convierte un registro clínico a formato FHIR Observation
+ */
+private async convertClinicalRecordToFhirObservation(recordId: number): Promise<FhirObservationDto> {
+  const record = await this.prisma.clinical_data.findUnique({
+    where: { ID_Clinical_data: recordId },
+    include: {
+      patient: true,
+      medic: true
+    }
+  });
+
+  if (!record) {
+    throw new NotFoundException(`Registro clínico con ID ${recordId} no encontrado`);
+  }
+
+  const fhirObservation: FhirObservationDto = {
+    resourceType: 'Observation',
+    id: record.ID_Clinical_data.toString(),
+    status: FhirObservationStatus.FINAL,
+    category: [{
+      coding: [{
+        system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+        code: 'survey',
+        display: 'Survey'
+      }],
+      text: record.type
+    }],
+    code: {
+      coding: [{
+        system: 'http://salud-nc.com/clinical-codes',
+        code: record.code || 'UNKNOWN',
+        display: record.type
+      }],
+      text: record.type
+    },
+    subject: {
+      reference: `Patient/${record.ID_Patients}`,
+      display: record.patient ? `${record.patient.Name} ${record.patient.Lastname}` : 'Paciente'
+    },
+    effectiveDateTime: record.effectiveDate?.toISOString(),
+    issued: new Date().toISOString(),
+    performer: [{
+      reference: `Practitioner/${record.ID_medics}`,
+      display: record.medic ? `${record.medic.Name} ${record.medic.Lastname}` : 'Médico'
+    }],
+    note: record.severity ? `Severidad: ${record.severity}` : undefined
+  };
+
+  // Agregar valor según el tipo de dato
+  if (record.value) {
+    const numericValue = parseFloat(record.value);
+    if (!isNaN(numericValue)) {
+      fhirObservation.valueQuantity = {
+        value: numericValue,
+        unit: record.unit || '',
+        system: 'http://unitsofmeasure.org',
+        code: record.unit || ''
+      };
+    } else {
+      fhirObservation.valueString = record.value;
+    }
+  }
+
+  return fhirObservation;
+}
+
+/**
+ * Sincroniza un paciente local con un servidor FHIR
+ */
+async syncPatientToFhir(dto: SyncPatientToFhirDto): Promise<any> {
+  try {
+    this.logger.log(`Sincronizando paciente ${dto.patientId} con servidor FHIR`);
+    
+    const fhirPatient = await this.convertPatientToFhir(parseInt(dto.patientId));
+    const serverConfig = this.fhirServers.get(dto.fhirServerId || 'default');
+    
+    if (!serverConfig) {
+      throw new BadRequestException(`Servidor FHIR no configurado: ${dto.fhirServerId}`);
+    }
+
+    // Enviar al servidor FHIR
+    const response = await this.sendToFhirServer(
+      serverConfig,
+      'Patient',
+      fhirPatient
+    );
+
+    // Actualizar el registro local con la información FHIR
+    await this.prisma.patients.update({
+      where: { ID_Patients: parseInt(dto.patientId) },
+      data: {
+        // Aquí podrías agregar campos para almacenar IDs FHIR si los tienes en el schema
+      }
+    });
+
+    this.logger.log(`Paciente sincronizado exitosamente con FHIR: ${dto.patientId}`);
+    return response;
+  } catch (error) {
+    this.logger.error(`Error al sincronizar paciente con FHIR: ${error.message}`, error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Sincroniza un registro clínico con un servidor FHIR como Observation
+ */
+async syncClinicalRecordToFhir(dto: SyncClinicalRecordToFhirDto): Promise<any> {
+  try {
+    this.logger.log(`Sincronizando registro clínico ${dto.clinicalRecordId} con servidor FHIR`);
+    
+    const fhirObservation = await this.convertClinicalRecordToFhirObservation(parseInt(dto.clinicalRecordId));
+    const serverConfig = this.fhirServers.get(dto.fhirServerId || 'default');
+    
+    if (!serverConfig) {
+      throw new BadRequestException(`Servidor FHIR no configurado: ${dto.fhirServerId}`);
+    }
+
+    // Aplicar estado personalizado si se proporciona
+    if (dto.status) {
+      fhirObservation.status = dto.status;
+    }
+
+    // Enviar al servidor FHIR
+    const response = await this.sendToFhirServer(
+      serverConfig,
+      'Observation',
+      fhirObservation
+    );
+
+    // Actualizar el registro local con datos FHIR
+    await this.prisma.clinical_data.update({
+      where: { ID_Clinical_data: parseInt(dto.clinicalRecordId) },
+      data: {
+        fhirData: JSON.stringify(fhirObservation)
+      }
+    });
+
+    this.logger.log(`Registro clínico sincronizado exitosamente con FHIR: ${dto.clinicalRecordId}`);
+    return response;
+  } catch (error) {
+    this.logger.error(`Error al sincronizar registro clínico con FHIR: ${error.message}`, error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Importa una observación desde un servidor FHIR
+ */
+async importObservationFromFhir(dto: ImportObservationFromFhirDto): Promise<any> {
+  try {
+    this.logger.log(`Importando observación FHIR: ${dto.fhirObservationId}`);
+    
+    const serverConfig = this.fhirServers.get('default');
+    const fhirObservation = await this.getFromFhirServer(
+      serverConfig,
+      'Observation',
+      dto.fhirObservationId
+    );
+
+    // Convertir observación FHIR a registro clínico local
+    const clinicalRecord = await this.convertFhirObservationToClinicalRecord(
+      fhirObservation,
+      dto.patientId,
+      dto.medicId,
+      dto.adminId
+    );
+
+    const createdRecord = await this.create(clinicalRecord);
+    
+    this.logger.log(`Observación FHIR importada exitosamente: ${dto.fhirObservationId}`);
+    return createdRecord;
+  } catch (error) {
+    this.logger.error(`Error al importar observación FHIR: ${error.message}`, error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Obtiene todos los registros clínicos con datos FHIR
+ */
+async getClinicalRecordsWithFhir(): Promise<any[]> {
+  try {
+    const records = await this.prisma.clinical_data.findMany({
+      where: {
+        fhirData: {
+          not: null
+        }
+      },
+      include: {
+        patient: true,
+        medic: true,
+        admin: true
+      }
+    });
+
+    return records.map(record => ({
+      ...record,
+      fhirData: record.fhirData ? JSON.parse(record.fhirData as string) : null
+    }));
+  } catch (error) {
+    this.logger.error(`Error al obtener registros con datos FHIR: ${error.message}`, error.stack);
+    throw error;
+  }
+}
+
+/**
+ * Métodos AUXILIARES FHIR
+ */
+private mapGenderToFhir(gender: string): FhirGender {
+  switch (gender?.toUpperCase()) {
+    case 'MALE': return FhirGender.MALE;
+    case 'FEMALE': return FhirGender.FEMALE;
+    case 'OTHER': return FhirGender.OTHER;
+    default: return FhirGender.UNKNOWN;
+  }
+}
+
+private async testFhirConnection(baseUrl: string): Promise<boolean> {
+  try {
+    // Simulación de test de conectividad
+    // En una implementación real, harías una petición HTTP al servidor FHIR
+    this.logger.log(`Probando conectividad con servidor FHIR: ${baseUrl}`);
+    return true; // Por ahora siempre retorna true
+  } catch (error) {
+    this.logger.error(`Error al probar conectividad FHIR: ${error.message}`);
+    return false;
+  }
+}
+
+private async sendToFhirServer(config: FhirServerConfigDto, resourceType: string, resource: any): Promise<any> {
+  try {
+    // Simulación de envío a servidor FHIR
+    // En una implementación real, usarías fetch o axios para enviar al servidor
+    this.logger.log(`Enviando ${resourceType} a servidor FHIR: ${config.baseUrl}`);
+    
+    const mockResponse = {
+      resourceType,
+      id: resource.id || Math.random().toString(36).substr(2, 9),
+      meta: {
+        versionId: '1',
+        lastUpdated: new Date().toISOString()
+      },
+      ...resource
+    };
+
+    return mockResponse;
+  } catch (error) {
+    this.logger.error(`Error al enviar a servidor FHIR: ${error.message}`);
+    throw new InternalServerErrorException('Error al comunicarse con el servidor FHIR');
+  }
+}
+
+private async getFromFhirServer(config: FhirServerConfigDto, resourceType: string, id: string): Promise<any> {
+  try {
+    // Simulación de obtención desde servidor FHIR
+    this.logger.log(`Obteniendo ${resourceType}/${id} desde servidor FHIR: ${config.baseUrl}`);
+    
+    // Mock de respuesta FHIR
+    const mockObservation = {
+      resourceType: 'Observation',
+      id,
+      status: 'final',
+      category: [{
+        coding: [{
+          system: 'http://terminology.hl7.org/CodeSystem/observation-category',
+          code: 'vital-signs',
+          display: 'Vital Signs'
+        }]
+      }],
+      code: {
+        coding: [{
+          system: 'http://loinc.org',
+          code: '85354-9',
+          display: 'Blood pressure panel'
+        }]
+      },
+      subject: {
+        reference: 'Patient/123'
+      },
+      effectiveDateTime: new Date().toISOString(),
+      valueQuantity: {
+        value: 120,
+        unit: 'mmHg',
+        system: 'http://unitsofmeasure.org',
+        code: 'mm[Hg]'
+      }
+    };
+
+    return mockObservation;
+  } catch (error) {
+    this.logger.error(`Error al obtener desde servidor FHIR: ${error.message}`);
+    throw new InternalServerErrorException('Error al comunicarse con el servidor FHIR');
+  }
+}
+
+private async convertFhirObservationToClinicalRecord(
+  fhirObservation: any,
+  patientId?: string,
+  medicId?: string,
+  adminId?: string
+): Promise<CreateClinicalRecordDto> {
+  // Extraer información de la observación FHIR
+  const code = fhirObservation.code?.coding?.[0]?.code || 'IMPORTED';
+  const display = fhirObservation.code?.coding?.[0]?.display || fhirObservation.code?.text || 'Imported from FHIR';
+  
+  let value = '';
+  let unit = '';
+  
+  if (fhirObservation.valueQuantity) {
+    value = fhirObservation.valueQuantity.value?.toString() || '';
+    unit = fhirObservation.valueQuantity.unit || '';
+  } else if (fhirObservation.valueString) {
+    value = fhirObservation.valueString;
+  }
+
+  // Obtener IDs por defecto si no se proporcionan
+  const defaultPatientId = patientId ? parseInt(patientId) : await this.getDefaultPatientId();
+  const defaultMedicId = medicId ? parseInt(medicId) : await this.getDefaultMedicId();
+  const defaultAdminId = adminId ? parseInt(adminId) : await this.getDefaultAdminId();
+
+  return {
+    ID_Patients: defaultPatientId,
+    type: display,
+    code,
+    value,
+    unit,
+    severity: 'Normal', // Valor por defecto
+    effectiveDate: fhirObservation.effectiveDateTime || new Date().toISOString(),
+    fhirData: JSON.stringify(fhirObservation),
+    ID_medics: defaultMedicId,
+    create: defaultAdminId
+  };
+}
+
+private async getDefaultPatientId(): Promise<number> {
+  const patient = await this.prisma.patients.findFirst();
+  if (!patient) {
+    throw new BadRequestException('No hay pacientes disponibles para importar datos FHIR');
+  }
+  return patient.ID_Patients;
+}
+
+private async getDefaultMedicId(): Promise<number> {
+  const medic = await this.prisma.medics.findFirst();
+  if (!medic) {
+    throw new BadRequestException('No hay médicos disponibles para importar datos FHIR');
+  }
+  return medic.ID_medics;
+}
+
+private async getDefaultAdminId(): Promise<number> {
+  const admin = await this.prisma.admins.findFirst();
+  if (!admin) {
+    throw new BadRequestException('No hay administradores disponibles para importar datos FHIR');
+  }
+  return admin.ID_Admins;
+}
+
+// ... existing code ...
 
