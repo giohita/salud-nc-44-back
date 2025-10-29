@@ -1,0 +1,173 @@
+// TODO: Hacer la migración
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Admins {
+  ID_Admins    Int       @id @default(autoincrement())
+  Name         String
+  Lastname     String
+  Email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  Phone_number String?
+  DNI          String    @unique
+
+  // Relaciones: Admin crea medics/patients/clinical_data
+  Medics        Medics[]        @relation("AdminCreatesMedics")
+  Patients      Patients[]      @relation("AdminCreatesPatients")
+  Clinical_data Clinical_data[] @relation("AdminCreatesClinicalData")
+}
+
+model Medics {
+  ID_medics     Int       @id @default(autoincrement())
+  DNI           String    @unique
+  Name          String
+  Lastname      String
+  Birthdate     DateTime
+  gender        Gender
+  phone_number  String?
+  email         String    @unique
+  passwordHash  String
+  specialty     String?
+  schedule      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  create        Int
+  admin         Admins    @relation("AdminCreatesMedics", fields: [create], references: [ID_Admins])
+
+  Appointments      Appointments[]
+  Clinical_data     Clinical_data[]
+  Teleconsultations Teleconsultations[]
+}
+
+model Patients {
+  ID_Patients   Int       @id @default(autoincrement())
+  DNI           String    @unique
+  Name          String
+  Lastname      String
+  Birthdate     DateTime
+  gender        Gender
+  phone_number  String?
+  email         String    @unique
+  passwordHash  String
+  address        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  create        Int
+  admin         Admins    @relation("AdminCreatesPatients", fields: [create], references: [ID_Admins])
+
+  Appointments      Appointments[]
+  Clinical_data     Clinical_data[]
+  Teleconsultations Teleconsultations[]
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum TeleconsultationType {
+  WEBRTC
+  EMERGENCY
+}
+
+enum TeleconsultationStatus {
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+model Appointments {
+  ID_Appointments    Int       @id @default(autoincrement())
+  ID_Patients        Int
+  ID_medics          Int
+  appointmentType    String
+  appointmentDatetime DateTime
+  status AppointmentStatus @default(PENDING)
+  notes              String?
+  reminderSent       Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relaciones
+  patient           Patients            @relation(fields: [ID_Patients], references: [ID_Patients])
+  medic             Medics              @relation(fields: [ID_medics], references: [ID_medics])
+  Teleconsultations Teleconsultations[]
+}
+
+model Teleconsultations {
+  id              Int                     @id @default(autoincrement())
+  patientId       Int
+  medicId         Int
+  appointmentId   Int?
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  endedAt         DateTime?
+  type            TeleconsultationType    @default(WEBRTC)
+  status          TeleconsultationStatus  @default(SCHEDULED)
+  sessionId       String?
+  roomId          String?
+  notes           String?
+  emergencyReason String?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  // Relaciones
+  patient     Patients      @relation(fields: [patientId], references: [ID_Patients])
+  medic       Medics        @relation(fields: [medicId], references: [ID_medics])
+  appointment Appointments? @relation(fields: [appointmentId], references: [ID_Appointments])
+}
+
+model Clinical_data {
+  ID_Clinical_data Int      @id @default(autoincrement())
+  ID_Patients      Int
+  type             String
+  code             String?
+  value            String?
+  unit             String?
+  severity         String?
+  effectiveDate    DateTime?
+  fhirData         Json?
+  ID_medics        Int
+
+  create           Int
+  admin            Admins   @relation("AdminCreatesClinicalData", fields: [create], references: [ID_Admins])
+
+  patient Patients @relation(fields: [ID_Patients], references: [ID_Patients])
+  medic   Medics   @relation(fields: [ID_medics], references: [ID_medics])
+}
+
+enum UserType {
+  ADMIN
+  MEDIC
+  PATIENT
+}
+
+model RefreshToken {
+  id         Int      @id @default(autoincrement())
+  tokenHash  String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  userType   UserType
+  userId     Int
+}
