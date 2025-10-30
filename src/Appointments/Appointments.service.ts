@@ -43,6 +43,7 @@ export class AppointmentsService {
   findAll() {
     return this.prisma.appointments.findMany({
       select: {
+        ID_Appointments: true,
         status:true,
         notes: true,
         appointmentDatetime: true,

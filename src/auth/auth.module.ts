@@ -11,7 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Module({
   imports: [
-    ConfigModule,
+    ConfigModule.forRoot({ isGlobal: true }),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

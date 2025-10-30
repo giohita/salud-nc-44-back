@@ -442,8 +442,8 @@ export class TeleconsultationService {
         this.sessionParticipants.set(teleconsultation.sessionId, new Map());
       }
       
-      const sessionMap = this.sessionParticipants.get(teleconsultation.sessionId);
-      sessionMap.set(participantId, participantInfo);
+      const sessionMap = this.sessionParticipants.get(teleconsultation.sessionId)!;
+        sessionMap.set(participantId, participantInfo);
 
       // Obtener lista de todos los participantes
       const participants = Array.from(sessionMap.values());

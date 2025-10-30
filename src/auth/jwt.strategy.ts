@@ -20,10 +20,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       secretOrKey: config.get('JWT_SECRET'),
     });
   }
-
-  async validate(payload: JwtPayload) {
+async validate(payload: JwtPayload) {
+  if (payload.userType === 'PATIENT') {
     return {
-      userId: payload.sub,
+      ID_Patients: payload.sub, // ya es obligatorio aquí
       dni: payload.dni,
       userType: payload.userType,
       name: payload.name,
@@ -31,4 +31,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       gender: payload.gender,
     };
   }
+  return {
+    userId: payload.sub,
+    dni: payload.dni,
+    userType: payload.userType,
+    name: payload.name,
+    lastname: payload.lastname,
+    gender: payload.gender,
+  };
+}
+
+ 
 }
