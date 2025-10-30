@@ -10,6 +10,7 @@ export class ReminderService {
     private readonly prisma: PrismaService,
   ) {}
 
+  // 🕖 Tarea automática que se ejecuta todos los días a las 7:00 a.m.
   @Cron(CronExpression.EVERY_DAY_AT_7AM)
   async sendDailyReminders() {
     const tomorrow = new Date();
@@ -40,5 +41,10 @@ export class ReminderService {
     }
 
     console.log(`✅ Recordatorios enviados para ${appointments.length} citas.`);
+  }
+
+  // 🧪 Método manual para pruebas desde el controlador
+  async sendReminders() {
+    return this.sendDailyReminders();
   }
 }
